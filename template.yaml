@@ -33,6 +33,28 @@ Resources:
         Sourcemap: true
         EntryPoints: 
         - app.ts
+  OnuSearchCountriesFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: onu-search-countries/
+      Handler: app.lambdaHandler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      Events:
+        OnuSearchCountries:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /onu-search-countries
+            Method: get
+    Metadata: # Manage esbuild properties
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: "es2020"
+        Sourcemap: true
+        EntryPoints: 
+        - app.ts
 
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
@@ -47,3 +69,12 @@ Outputs:
   HelloWorldFunctionIamRole:
     Description: "Implicit IAM Role created for Hello World function"
     Value: !GetAtt HelloWorldFunctionRole.Arn
+  OnuSearchCountriesApi:
+    Description: "API Gateway endpoint URL for Prod stage for Onu Search Countries function"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Dev/onu-search-countries/"
+  OnuSearchCountriesFunction:
+    Description: "Onu Search Countries Lambda Function ARN"
+    Value: !GetAtt OnuSearchCountriesFunction.Arn
+  OnuSearchCountriesFunctionIamRole:
+    Description: "Implicit IAM Role created for Onu Search Countries function"
+    Value: !GetAtt OnuSearchCountriesFunctionRole.Arn
