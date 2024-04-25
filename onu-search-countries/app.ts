@@ -1,15 +1,30 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
+import dotenv from 'dotenv';
 
-const client = new DynamoDBClient({
-    region: 'localhost',
-    endpoint: 'http://dynamodb:8000',
-    credentials: {
-        accessKeyId: '5eitv',
-        secretAccessKey: 'j0h4e',
-    },
-});
+dotenv.config();
+
+//Select the correct client credentials
+let client: DynamoDBClient;
+if (String(process.env.AWS_LOCAL) === 'true') {
+    console.debug('Using local credentials...');
+    const clientCredentials = {
+        region: String(process.env.AWS_LOCAL_REGION),
+        endpoint: String(process.env.AWS_LOCAL_ENDPOINT),
+        credentials: {
+            accessKeyId: String(process.env.AWS_LOCAL_SECRET_KEY_ID),
+            secretAccessKey: String(process.env.AWS_LOCAL_SECRET_ACCESS_KEY),
+        },
+    };
+
+    console.log(JSON.stringify(clientCredentials));
+
+    client = new DynamoDBClient(clientCredentials);
+} else {
+    console.debug('Using cloud credentials...');
+    client = new DynamoDBClient({});
+}
 
 const docClient = DynamoDBDocumentClient.from(client);
 
