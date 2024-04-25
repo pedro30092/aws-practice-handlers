@@ -1,22 +1,29 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  CreateTableCommand,
+  DeleteTableCommand,
+  DynamoDBClient,
+  ListTablesCommand,
+} from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { faker } from "@faker-js/faker";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-export const countries = faker.helpers.multiple(
-  () => {
-    return {
-      name: faker.location.country(),
-    };
-  },
-  {
-    count: 100,
-  }
-);
+function generateRandomeCountries(total: number) {
+  return faker.helpers.multiple(
+    () => {
+      return {
+        name: faker.location.country(),
+      };
+    },
+    {
+      count: total,
+    }
+  );
+}
 
-export const generateNews = (total: number) => {
+function generateNews(total: number): any {
   const data = faker.helpers.multiple(
     () => {
       return {
@@ -30,30 +37,83 @@ export const generateNews = (total: number) => {
   );
 
   return data;
-};
+}
 
-const client = new DynamoDBClient({
-  region: String(process.env.AWS_REGION),
-  endpoint: String(process.env.AWS_ENDPOINT),
-  credentials: {
-    accessKeyId: String(process.env.AWS_ACCESS_KEY_ID),
-    secretAccessKey: String(process.env.AWS_SECRET_ACCESS_KEY),
-  },
-});
+async function resetTable() {
+  const listCommand = new ListTablesCommand({});
+  const listResponse = await docClient.send(listCommand);
+  const tableName = "Country";
+  const tables = listResponse.TableNames;
+
+  if (tables && tables.includes(tableName)) {
+    console.log("Deleting table Country...");
+    const deleteCommand = new DeleteTableCommand({
+      TableName: tableName,
+    });
+    await docClient.send(deleteCommand);
+  }
+
+  console.log("Creating table Country...");
+  const createCommand = new CreateTableCommand({
+    TableName: tableName,
+    AttributeDefinitions: [
+      {
+        AttributeName: "id",
+        AttributeType: "S",
+      },
+    ],
+    KeySchema: [
+      {
+        AttributeName: "id",
+        KeyType: "HASH",
+      },
+    ],
+    ProvisionedThroughput: {
+      ReadCapacityUnits: 1,
+      WriteCapacityUnits: 1,
+    },
+  });
+
+  await docClient.send(createCommand);
+}
+
+//Select the correct client credentials
+let client: DynamoDBClient;
+if (process.env.AWS_LOCAL === "true") {
+  console.debug("Using local credentials...");
+  const clientCredentials = {
+    region: String(process.env.AWS_REGION),
+    endpoint: String(process.env.AWS_ENDPOINT),
+    credentials: {
+      accessKeyId: String(process.env.AWS_SECRET_KEY_ID),
+      secretAccessKey: String(process.env.AWS_SECRET_ACCESS_KEY),
+    },
+  };
+  client = new DynamoDBClient(clientCredentials);
+} else {
+  console.debug("Using cloud credentials...");
+  client = new DynamoDBClient({});
+}
+
 const docClient = DynamoDBDocumentClient.from(client);
+const totalCountries = 100;
 
 export const main = async () => {
+  await resetTable();
+
   const nonDuplicatedCountries: string[] = [];
 
   //Filter countries to avoid duplicates
-  const countriesToAdd = countries.filter((country) => {
-    if (nonDuplicatedCountries.includes(country.name)) {
-      return false;
-    } else {
-      nonDuplicatedCountries.push(country.name);
-      return true;
+  const countriesToAdd = generateRandomeCountries(totalCountries).filter(
+    (country) => {
+      if (nonDuplicatedCountries.includes(country.name)) {
+        return false;
+      } else {
+        nonDuplicatedCountries.push(country.name);
+        return true;
+      }
     }
-  });
+  );
 
   //Generate PutItem request structure
   const putItems = countriesToAdd.map((country) => {
@@ -72,7 +132,7 @@ export const main = async () => {
 
     return {
       id: faker.string.uuid(),
-      name: country.name,
+      countryName: country.name,
       hasDevLaw: hasDevLaw,
       news: news,
     };
@@ -80,8 +140,6 @@ export const main = async () => {
 
   //Insert data into DynamoDB
   for (const item of putItems) {
-    console.log("Adding item: ", JSON.stringify(item));
-
     const command = new PutCommand({
       TableName: "Country",
       Item: item,
